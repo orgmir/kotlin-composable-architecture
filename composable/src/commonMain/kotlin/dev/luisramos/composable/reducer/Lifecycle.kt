@@ -37,7 +37,7 @@ internal class LifecycleReducerIml<WrappedState, WrappedAction>(
             toChildState = { it },
             fromChildState = { _, child -> child },
             toChildAction = { (it as? LifecycleReducer.Action.Wrapped<WrappedAction>)?.action },
-            fromChildAction = { _, child -> LifecycleReducer.Action.Wrapped(child) }
+            fromChildAction = { LifecycleReducer.Action.Wrapped(it) }
         ) {
             wrapped
         }

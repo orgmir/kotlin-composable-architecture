@@ -1,8 +1,8 @@
 package dev.luisramos.composable.reducer
 
-import dev.luisramos.composable.ActionPath
+import dev.luisramos.composable.CasePath
+import dev.luisramos.composable.KeyPath
 import dev.luisramos.composable.ReducerProtocol
-import dev.luisramos.composable.StatePath
 import dev.luisramos.composable.merge
 import kotlinx.coroutines.flow.map
 
@@ -10,7 +10,7 @@ public fun <State, Action, ChildState, ChildAction> ReducerProtocol<State, Actio
     toChildState: (State) -> ChildState?,
     fromChildState: (State, ChildState) -> State,
     toChildAction: (Action) -> ChildAction?,
-    fromChildAction: (Action, ChildAction) -> Action,
+    fromChildAction: (ChildAction) -> Action,
     block: () -> ReducerProtocol<ChildState & Any, ChildAction>
 ): ReducerProtocol<State, Action> {
     val child = block()
@@ -30,7 +30,7 @@ public fun <State, Action, ChildState, ChildAction> ReducerProtocol<State, Actio
             )
             return newState.withEffect(
                 merge(
-                    newChildEffect.map { fromChildAction(action, it) },
+                    newChildEffect.map { fromChildAction(it) },
                     newEffect
                 )
             )
@@ -39,13 +39,13 @@ public fun <State, Action, ChildState, ChildAction> ReducerProtocol<State, Actio
 }
 
 public fun <State, Action, ChildState, ChildAction> ReducerProtocol<State, Action>.optional(
-    state: StatePath<State, ChildState?>,
-    action: ActionPath<Action, ChildAction>,
+    state: KeyPath<State, ChildState>,
+    action: CasePath<Action, ChildAction>,
     block: () -> ReducerProtocol<ChildState & Any, ChildAction>
 ): ReducerProtocol<State, Action> = optional(
-    toChildState = state.extract,
-    fromChildState = state.embed,
-    toChildAction = action.extract,
-    fromChildAction = action.embed,
+    toChildState = state::extract,
+    fromChildState = state::embed,
+    toChildAction = action::extract,
+    fromChildAction = action::embed,
     block = block
 )

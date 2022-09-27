@@ -7,7 +7,7 @@ import dev.luisramos.composable.reducer.withNoEffect
  * Reducer protocol that enables abstracting away business logic in a single reducer
  * or in a combination of several reducers
  *
- * Override [body] if you want to declare several reducers. Check [ReducerBuilder] for
+ * Override [body] if you want to declare several reducers. Check [dev.luisramos.composable.reducer.ReducerBuilder] for
  * helpful builders. Override [reduce] if you want to get straight into it
  */
 public interface ReducerProtocol<State, Action> {
@@ -33,18 +33,51 @@ public class EmptyReducer<State, Action> : ReducerProtocol<State, Action> {
 }
 
 /**
- * Describes how to embed and extract state from Parent state
+ * Describes how to extract an action from a parent action. This assumes actions
+ * in the for of
+ *
+ * sealed class Action {
+ *  data class Child(val action: ChildAction): Action()
+ *
+ *  companion object {
+ *      val child = CasePath(::Child, Child::action)
+ *  }
+ * }
  */
-public class StatePath<Parent, Child>(
-    public val embed: (Parent, Child) -> Parent,
-    public val extract: (Parent) -> Child
+public class CasePath<Root, Value>(
+    embed: (Value) -> Root,
+    extract: (Root) -> Value?
+) {
+    private val _embed = embed
+    private val _extract = extract
+    public fun embed(value: Value): Root = _embed(value)
+    public fun extract(root: Root): Value? = _extract(root)
+}
+
+/**
+ * Helper function to help us extract an action from a parent action
+ * and embed an action into a parent action
+ */
+@Suppress("FunctionName")
+public inline fun <Root, reified Case : Root, Value> CasePath(
+    noinline embed: (Value) -> Root,
+    crossinline extract: (Case) -> Value
+): CasePath<Root, Value> = CasePath<Root, Value>(
+    embed = embed,
+    extract = { root -> (root as? Case)?.let { extract(root) } }
 )
 
 /**
- * Describes how to embed and extract an action from a parent action
+ * Describes how to extract state from parent state
+ * and how to embed state into parent state
  */
-public class ActionPath<Parent, Child>(
-    public val embed: (parent: Parent, child: Child) -> Parent,
-    public val extract: (parent: Parent) -> Child?
-)
+public class KeyPath<Root, Value>(
+    embed: (Root, Value) -> Root,
+    extract: (Root) -> Value
+) {
+    private val _embed = embed
+    private val _extract = extract
+    public fun embed(root: Root, value: Value): Root = _embed(root, value)
+    public fun extract(root: Root): Value = _extract(root)
+}
 

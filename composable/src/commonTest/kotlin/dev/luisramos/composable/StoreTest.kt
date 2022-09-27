@@ -1,5 +1,6 @@
 package dev.luisramos.composable
 
+import dev.luisramos.composable.reducer.OptionalScope
 import dev.luisramos.composable.reducer.Reducer
 import dev.luisramos.composable.reducer.ReducerResult
 import dev.luisramos.composable.reducer.Scope
@@ -99,13 +100,19 @@ class StoreTest {
         var isTest: Boolean = true
 
         data class State(
-            var counter: Counter.State
+            val counter: Counter.State,
+            val optionalCounter: Counter.State? = null,
+            val localCounter: Int = 0
         ) {
-
             companion object {
-                val counter = StatePath<State, Counter.State>(
-                    embed = { global, local -> global.copy(counter = local) },
-                    extract = { it.counter }
+                val counter = KeyPath(
+                    embed = { parent, child -> parent.copy(counter = child) },
+                    extract = State::counter
+                )
+
+                val optionalCounter = KeyPath(
+                    embed = { parent, child -> parent.copy(optionalCounter = child) },
+                    extract = State::optionalCounter
                 )
             }
         }
@@ -113,11 +120,11 @@ class StoreTest {
         sealed class Action {
             data class Counter(val action: StoreTest.Counter.Action) : Action()
 
+            object SetOptionalState : Action()
+
             companion object {
-                val counter = ActionPath<Action, StoreTest.Counter.Action>(
-                    embed = { _, local -> Counter(local) },
-                    extract = { (it as? Counter)?.action }
-                )
+                val counter =
+                    CasePath<Action, Counter, StoreTest.Counter.Action>(::Counter, Counter::action)
             }
         }
 
@@ -125,11 +132,36 @@ class StoreTest {
             +Scope(State.counter, Action.counter) {
                 Counter()
             }
+            +OptionalScope(State.optionalCounter, Action.counter) {
+                Counter()
+            }
+            +Reducer<State, Action> { state, action ->
+                when (action) {
+                    is Action.Counter -> state.withNoEffect()
+                    is Action.SetOptionalState -> state.copy(optionalCounter = Counter.State(0))
+                        .withNoEffect()
+                }
+            }
         }
     }
 
     @Test
-    fun pullbackShouldTransformReducerToLocalState() = runTest {
+    fun optionalScopeShouldNotReceiveActionsUntilItIsNonOptional() = runTest {
+        val store = Store(AppFeature.State(Counter.State(0)), AppFeature(), coroutineContext, false)
+
+        store.send(AppFeature.Action.Counter(Counter.Action.Increment))
+
+        assertEquals(1, store.state.value.counter.counter)
+
+        store.send(AppFeature.Action.SetOptionalState)
+        store.send(AppFeature.Action.Counter(Counter.Action.Decrement))
+
+        assertEquals(0, store.state.value.counter.counter)
+        assertEquals(-1, store.state.value.optionalCounter?.counter)
+    }
+
+    @Test
+    fun scopeShouldTransformReducerToLocalState() = runTest {
         val store = Store(AppFeature.State(Counter.State(0)), AppFeature(), coroutineContext, false)
 
         store.send(AppFeature.Action.Counter(Counter.Action.Increment))
