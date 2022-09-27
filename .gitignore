@@ -8,7 +8,6 @@ captures
 .cxx
 local.properties
 xcuserdata
-*.jar
 *.war
 *.nar
 *.ear
